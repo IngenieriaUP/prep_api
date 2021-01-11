@@ -1,7 +1,7 @@
 import time
 import re
 import numpy as np
-from pulp import LpMinimize, LpProblem, LpVariable, lpSum, LpBinary
+from pulp import LpMinimize, LpProblem, LpVariable, lpSum, LpBinary, LpStatus
 from fastapi import FastAPI
 from pydantic import BaseModel
 
@@ -56,14 +56,21 @@ def build_and_solve(p, candidates, facilities, cost, demand):
             ix = int(re.findall('\d+', v.name)[0])
             y_vars[ix] = int(v.varValue)
 
-    return end_build-start_build, solve_end-solve_start, y_vars
+    obj_value = prob.objective.value()
+    status = LpStatus[prob.status]
+    build_time = end_build-start_build
+    solve_time = solve_end-solve_start
+
+        ## TODO: add solver return and configurability?
+
+    return build_time, solve_time, obj_value, x_vars, y_vars
 
 app = FastAPI()
 
 @app.post('/optimize/')
 async def optimize(model: Model):
-    build, solve, facilities = build_and_solve(model.p, model.candidates,
-                                   model.facilities, model.cost,
-                                   model.demand)
+    build, solve, obj, assignments, facilities = build_and_solve(model.p, model.candidates,
+                                                                   model.facilities, model.cost,
+                                                                   model.demand)
 
-    return {'build_time': build, 'solve_time': solve, 'facilities': facilities}
+    return {'build_time': build, 'solve_time': solve, 'obj_value': obj, 'assignments': assignments, 'facilities': facilities}
